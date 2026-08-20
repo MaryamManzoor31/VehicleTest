@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AeroDyn 3D | Virtual Vehicle Engineering & Performance Lab</title>
+    <meta name="description"
+        content="Interactive 3D Vehicle Modification and Performance Simulation for Desktop and Meta Quest 3S VR. Modify parts, observe physics, test drive, and learn automotive engineering.">
+
+    <!-- A-Frame 1.6.0 for WebXR and 3D Rendering -->
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+
+    <!-- Google Fonts: Orbitron, Rajdhani, Inter, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #05070d;
+            --bg-card: rgba(10, 15, 26, 0.88);
+            --bg-card-solid: #0d1322;
+            --border-color: rgba(0, 243, 255, 0.22);
+            --cyan: #00f3ff;
+            --cyan-glow: rgba(0, 243, 255, 0.35);
+            --amber: #ffb703;
+            --amber-glow: rgba(255, 183, 3, 0.35);
+            --red: #ff3366;
+            --green: #00f59b;
+            --text-main: #f0f4fc;
+            --text-muted: #8e9bb0;
+            --font-display: 'Orbitron', sans-serif;
+            --font-tech: 'Rajdhani', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --glass-blur: blur(16px);
+            --hud-radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-body);
+        }
+
+        #scene-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #hud-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            pointer-events: none;
+            display: grid;
+            grid-template-rows: 58px 1fr 50px;
+            grid-template-columns: 330px 1fr 340px;
+            gap: 12px;
+            padding: 12px;
+            transition: opacity 0.3s ease;
+        }
+
+        .hud-interactive {
+            pointer-events: auto;
+        }
+
+        /* Top Navigation Bar */
+        #top-nav {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: var(--hud-radius);
+            padding: 0 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 15px var(--cyan-glow);
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #fff;
+        }
+
+        .brand-logo span {
+            color: var(--cyan);
+            text-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .badge-tag {
+            font-family: var(--font-tech);
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: rgba(0, 243, 255, 0.15);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 2px 7px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+        }
+
+        .vehicle-selector-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .veh-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            font-family: var(--font-tech);
+            font-size: 0.95rem;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .veh-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .veh-btn.active {
+            color: #05070d;
+            background: var(--cyan);
+            border-color: var(--cyan);
+            box-shadow: 0 0 12px var(--cyan-glow);
+            font-weight: 800;
+        }
+
+        .mode-nav {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .mode-tab {
+            background: rgba(10, 14, 22, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            font-family: var(--font-tech);
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+        }
+
+        .mode-tab:hover {
+            color: #fff;
+            border-color: var(--cyan);
+        }
+
+        .mode-tab.active {
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.25), rgba(0, 150, 255, 0.1));
+            border-color: var(--cyan);
+            color: #fff;
+            box-shadow: 0 0 14px var(--cyan-glow);
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-family: var(--font-tech);
+            font-size: 0.88rem;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 243, 255, 0.15);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .action-btn.btn-compare {
+            background: linear-gradient(135deg, rgba(255, 183, 3, 0.2), rgba(255, 85, 0, 0.1));
+            border-color: var(--amber);
+            color: var(--amber);
+        }
+
+        /* Left Sidebar: 11-Part Modification Studio */
+        #sidebar-mods {
+            grid-column: 1 / 2;
+            background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: var(--hud-radius);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        }
+
+        .panel-header {
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.35);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-header h2 {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--cyan);
+            text-transform: uppercase;
+        }
+
+        .mod-count {
+            font-family: var(--font-tech);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .mods-scrollable {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mods-scrollable::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .mods-scrollable::-webkit-scrollbar-thumb {
+            background: rgba(0, 243, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        /* Vehicle Selector List in Sidebar */
+        .vehicles-list-row {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-bottom: 6px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .veh-item-card {
+            background: rgba(15, 22, 35, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 5px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-family: var(--font-tech);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            transition: all 0.15s ease;
+        }
+
+        .veh-item-card:hover {
+            background: rgba(0, 243, 255, 0.15);
+            border-color: var(--cyan);
+            color: #fff;
+        }
+
+        .veh-item-card.active {
+            background: var(--cyan);
+            border-color: var(--cyan);
+            color: #05070d;
+            font-weight: 800;
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .mod-card {
+            background: rgba(15, 22, 35, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 7px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .mod-card-header {
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .mod-card-header:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .mod-title-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mod-icon {
+            font-size: 1rem;
+            color: var(--cyan);
+        }
+
+        .mod-title {
+            font-family: var(--font-tech);
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .mod-current-val {
+            font-family: var(--font-tech);
+            font-size: 0.8rem;
+            color: var(--amber);
+            font-weight: 700;
+        }
+
+        .mod-cycle-btn {
+            background: rgba(255, 183, 3, 0.15);
+            border: 1px solid var(--amber);
+            color: var(--amber);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: var(--font-tech);
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .mod-cycle-btn:hover {
+            background: var(--amber);
+            color: #000;
+        }
+
+        .color-swatches-row {
+            display: flex;
+            gap: 5px;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+        }
+
+        .c-swatch {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        .c-swatch:hover {
+            transform: scale(1.25);
+            border-color: #fff;
+        }
+
+        /* Right Sidebar: Performance Telemetry & Educational Insight */
+        #sidebar-perf {
+            grid-column: 3 / 4;
+            background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: var(--hud-radius);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        }
+
+        .perf-metrics-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .perf-metrics-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .perf-metrics-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 243, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .stat-row {
+            background: rgba(15, 22, 35, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            padding: 6px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .stat-label {
+            font-family: var(--font-tech);
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .stat-values {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-val-curr {
+            color: #fff;
+        }
+
+        .stat-val-delta {
+            font-family: var(--font-tech);
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .delta-pos {
+            color: var(--green);
+        }
+
+        .delta-neg {
+            color: var(--red);
+        }
+
+        .stat-bar-track {
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-bar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, var(--cyan), #00aaff);
+            border-radius: 3px;
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #edu-card {
+            background: linear-gradient(145deg, rgba(18, 26, 42, 0.95), rgba(10, 15, 25, 0.95));
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 4px;
+            box-shadow: 0 4px 20px rgba(0, 243, 255, 0.1);
+        }
+
+        .edu-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-display);
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--cyan);
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+
+        .edu-title {
+            font-family: var(--font-tech);
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .edu-why {
+            font-size: 0.76rem;
+            line-height: 1.35;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .edu-pros-cons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            font-size: 0.72rem;
+            font-family: var(--font-tech);
+        }
+
+        .edu-pros {
+            background: rgba(0, 245, 155, 0.08);
+            border-left: 2px solid var(--green);
+            padding: 4px 6px;
+            border-radius: 0 4px 4px 0;
+            color: #d1fae5;
+        }
+
+        .edu-cons {
+            background: rgba(255, 51, 102, 0.08);
+            border-left: 2px solid var(--red);
+            padding: 4px 6px;
+            border-radius: 0 4px 4px 0;
+            color: #ffe4e6;
+        }
+
+        /* Bottom Toolbar */
+        #bottom-toolbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: var(--hud-radius);
+            padding: 6px 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        }
+
+        .view-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            font-family: var(--font-tech);
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .tool-btn:hover {
+            color: #fff;
+            border-color: var(--cyan);
+        }
+
+        .tool-btn.active {
+            background: rgba(0, 243, 255, 0.15);
+            border-color: var(--cyan);
+            color: var(--cyan);
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        /* Active Driving Speedometer HUD */
+        #driving-hud {
+            position: absolute;
+            bottom: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            align-items: center;
+            gap: 20px;
+            background: rgba(10, 15, 25, 0.88);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 10px 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px var(--cyan-glow);
+            pointer-events: auto;
+            z-index: 20;
+        }
+
+        #driving-hud.visible {
+            display: flex;
+        }
+
+        .gauge-unit {
+            text-align: center;
+        }
+
+        .speedo-num {
+            font-family: var(--font-display);
+            font-size: 2.6rem;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1;
+            text-shadow: 0 0 15px var(--cyan-glow);
+        }
+
+        .speedo-label {
+            font-family: var(--font-tech);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--cyan);
+        }
+
+        .tach-num {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--amber);
+            line-height: 1;
+        }
+
+        .tach-label {
+            font-family: var(--font-tech);
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--amber);
+            letter-spacing: 1px;
+        }
+
+        .gear-num {
+            font-family: var(--font-display);
+            font-size: 2.0rem;
+            font-weight: 900;
+            color: var(--green);
+            line-height: 1;
+        }
+
+        .drive-telemetry {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            font-family: var(--font-tech);
+            font-size: 0.8rem;
+            border-left: 1px solid rgba(255, 255, 255, 0.15);
+            padding-left: 14px;
+            min-width: 130px;
+        }
+
+        .telemetry-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Drive Controls Key Guide */
+        #drive-controls-guide {
+            position: absolute;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 15, 25, 0.88);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-family: var(--font-tech);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: none;
+            align-items: center;
+            gap: 14px;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        #drive-controls-guide kbd {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            padding: 2px 5px;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        /* Toast Alert */
+        #vr-toast {
+            position: absolute;
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: var(--bg-card-solid);
+            border: 1px solid var(--cyan);
+            box-shadow: 0 0 20px var(--cyan-glow);
+            backdrop-filter: blur(12px);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-family: var(--font-display);
+            font-size: 11px;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2000;
+        }
+
+        #vr-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Full Comparison Modal */
+        #modal-comparison {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 7, 12, 0.85);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            pointer-events: auto;
+        }
+
+        #modal-comparison.active {
+            display: flex;
+        }
+
+        .compare-container {
+            width: 880px;
+            max-width: 95vw;
+            max-height: 88vh;
+            background: var(--bg-card-solid);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 243, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .compare-header {
+            padding: 14px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .compare-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-tech);
+            font-size: 0.95rem;
+        }
+
+        .compare-table th,
+        .compare-table td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .compare-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* Help & Guide Modal */
+        #modal-help {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 7, 12, 0.85);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            pointer-events: auto;
+        }
+
+        #modal-help.active {
+            display: flex;
+        }
+
+        .help-box {
+            width: 720px;
+            max-width: 95vw;
+            background: var(--bg-card-solid);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .help-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .help-card {
+            background: rgba(15, 22, 35, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .help-card h4 {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            color: var(--cyan);
+            margin-bottom: 6px;
+        }
+
+        .help-card ul {
+            list-style: none;
+            font-family: var(--font-tech);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        @media (max-width: 1100px) {
+            #hud-overlay {
+                grid-template-columns: 280px 1fr 290px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ========================================================================= -->
+    <!-- A-FRAME 3D SCENE CONTAINER                                                -->
+    <!-- ========================================================================= -->
+    <div id="scene-container">
+        <a-scene cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable; interval: 25;"
+            renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 2;"
+            vr-mode-ui="enabled: true" loading-screen="dotsColor: #00f3ff; backgroundColor: #05070d"
+            background="color: #05070d" shadow="type: pcfsoft">
+            <a-assets timeout="10000"></a-assets>
+
+            <!-- LIGHTING RIG -->
+            <a-entity id="lighting-rig">
+                <a-entity light="type: ambient; color: #607090; intensity: 0.9;"></a-entity>
+                <a-entity id="key-light" light="type: directional; color: #ffffff; intensity: 1.8; castShadow: true;"
+                    position="5 10 5"></a-entity>
+                <a-entity light="type: directional; color: #00f3ff; intensity: 0.9;" position="-6 4 -4"></a-entity>
+                <a-entity light="type: directional; color: #ff0055; intensity: 0.6;" position="6 2 -6"></a-entity>
+                <a-entity light="type: point; color: #00f3ff; intensity: 1.5; distance: 15; decay: 2;"
+                    position="0 0.2 0"></a-entity>
+            </a-entity>
+
+            <!-- CAMERA RIG WITH VR & DESKTOP CONTROLS -->
+            <a-entity id="rig" position="0 1.2 4.2">
+                <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false"
+                    position="0 0 0">
+                    <a-ring id="vr-vignette" position="0 0 -0.5" radius-inner="0.35" radius-outer="1.2"
+                        material="color: #000; opacity: 0; transparent: true; shader: flat" visible="true"></a-ring>
+                </a-camera>
+
+                <!-- VR Laser Touch Controls for Meta Quest 3S -->
+                <a-entity id="left-controller" oculus-touch-controls="hand: left" laser-controls="hand: left"
+                    raycaster="objects: .clickable; showLine: true; lineColor: #00f3ff"></a-entity>
+                <a-entity id="right-controller" oculus-touch-controls="hand: right" laser-controls="hand: right"
+                    raycaster="objects: .clickable; showLine: true; lineColor: #ff0055"></a-entity>
+            </a-entity>
+
+            <a-sky id="sky-dome" color="#05070d"></a-sky>
+
+            <!-- ===================================================================== -->
+            <!-- 1. CYBER SHOWROOM GARAGE ENVIRONMENT                                  -->
+            <!-- ===================================================================== -->
+            <a-entity id="env-showroom" position="0 0 0" visible="true">
+                <!-- Reflective Floor Plate -->
+                <a-cylinder position="0 -0.05 0" radius="20" height="0.1"
+                    material="color: #0a0e1a; roughness: 0.2; metalness: 0.8" shadow="receive: true"></a-cylinder>
+
+                <!-- Obsidian Turntable Platform -->
+                <a-cylinder id="turntable-base" position="0 0.05 0" radius="3.4" height="0.12"
+                    material="color: #04060c; roughness: 0.1; metalness: 0.9" shadow="receive: true">
+                    <a-torus position="0 0.07 0" rotation="90 0 0" radius="3.38" radius-tubular="0.03"
+                        material="color: #00f3ff; shader: flat; opacity: 0.95"></a-torus>
+                    <a-torus position="0 0.07 0" rotation="90 0 0" radius="2.2" radius-tubular="0.015"
+                        material="color: #00f3ff; opacity: 0.4; shader: flat"></a-torus>
+                </a-cylinder>
+
+                <!-- Ceiling Neon Accent Light Rings -->
+                <a-entity position="0 6.5 0">
+                    <a-ring rotation="90 0 0" radius-inner="3.8" radius-outer="4.1"
+                        material="color: #ffffff; shader: flat; emissive: #ffffff; emissiveIntensity: 2"></a-ring>
+                    <a-ring rotation="90 0 0" radius-inner="7.8" radius-outer="8.1"
+                        material="color: #00f3ff; shader: flat; emissive: #00f3ff; emissiveIntensity: 1.5"></a-ring>
+                </a-entity>
+
+                <!-- Garage Accent Pillars -->
+                <a-cylinder position="-10 4 -10" radius="0.4" height="8" material="color: #1e293b"></a-cylinder>
+                <a-cylinder position="10 4 -10" radius="0.4" height="8" material="color: #1e293b"></a-cylinder>
+            </a-entity>
+
+            <!-- ===================================================================== -->
+            <!-- 2. TESTING TRACK ENVIRONMENT                                          -->
+            <!-- ===================================================================== -->
+            <a-entity id="env-track" position="0 0 0" visible="false">
+                <a-plane position="0 0 -150" rotation="-90 0 0" width="80" height="400"
+                    material="color: #111827; roughness: 0.9; metalness: 0.1"></a-plane>
+                <a-box position="-20 0.3 -150" width="0.6" height="0.6" depth="400"
+                    material="color: #ef4444; shader: flat"></a-box>
+                <a-box position="20 0.3 -150" width="0.6" height="0.6" depth="400"
+                    material="color: #00f3ff; shader: flat"></a-box>
+                <a-entity id="track-lines-container"></a-entity>
+
+                <!-- Zone 1: Launchpad -->
+                <a-entity position="0 0 10">
+                    <a-box position="0 5 0" width="16" height="1.2" depth="1.0" material="color: #0f172a">
+                        <a-text value="ZONE 1: ACCELERATION RUN (0-100 KM/H)" align="center" position="0 0 0.55"
+                            color="#00ff88" width="14" font="mozillavr"></a-text>
+                    </a-box>
+                </a-entity>
+
+                <!-- Zone 2: Braking Area -->
+                <a-entity position="0 0 -70">
+                    <a-box position="0 5 0" width="16" height="1.0" depth="0.8" material="color: #0f172a">
+                        <a-text value="ZONE 2: EMERGENCY BRAKING DISTANCE TEST" align="center" position="0 0 0.45"
+                            color="#ff0055" width="13" font="mozillavr"></a-text>
+                    </a-box>
+                </a-entity>
+
+                <!-- Zone 3: Slalom Pylons -->
+                <a-entity position="0 0 -130">
+                    <a-cylinder position="-3 0.4 -15" radius="0.3" height="0.8" material="color: #f97316"></a-cylinder>
+                    <a-cylinder position="3 0.4 -30" radius="0.3" height="0.8" material="color: #f97316"></a-cylinder>
+                    <a-cylinder position="-3 0.4 -45" radius="0.3" height="0.8" material="color: #f97316"></a-cylinder>
+                    <a-cylinder position="3 0.4 -60" radius="0.3" height="0.8" material="color: #f97316"></a-cylinder>
+                </a-entity>
+
+                <!-- Finish Banner -->
+                <a-entity position="0 0 -350">
+                    <a-box position="0 6 0" width="17" height="1.5" depth="1.2" material="color: #00f3ff">
+                        <a-text value="TEST RUN FINISHED" align="center" position="0 0 0.65" color="#05070d" width="14"
+                            font="mozillavr"></a-text>
+                    </a-box>
+                </a-entity>
+            </a-entity>
+
+            <!-- ===================================================================== -->
+            <!-- 3. DRIVER'S LICENSE PRACTICE COURSE                                   -->
+            <!-- ===================================================================== -->
+            <a-entity id="env-license" position="0 0 0" visible="false">
+                <a-plane position="0 0 -75" rotation="-90 0 0" width="70" height="200"
+                    material="color: #1e293b; roughness: 0.9"></a-plane>
+
+                <a-entity id="license-traffic-light" position="6 0 -15">
+                    <a-cylinder position="0 3 0" radius="0.15" height="6" material="color: #475569"></a-cylinder>
+                    <a-box position="0 5.2 0" width="0.7" height="1.8" depth="0.6" material="color: #0f172a">
+                        <a-sphere id="tl-red" position="0 0.5 0.32" radius="0.2"
+                            material="color: #ef4444; shader: flat; emissive: #ef4444; emissiveIntensity: 2"></a-sphere>
+                        <a-sphere id="tl-yellow" position="0 0 0.32" radius="0.2"
+                            material="color: #475569; shader: flat"></a-sphere>
+                        <a-sphere id="tl-green" position="0 -0.5 0.32" radius="0.2"
+                            material="color: #475569; shader: flat"></a-sphere>
+                    </a-box>
+                </a-entity>
+
+                <a-box position="0 0.05 -15" width="12" height="0.05" depth="0.8"
+                    material="color: #fff; shader: flat"></a-box>
+            </a-entity>
+
+            <!-- ===================================================================== -->
+            <!-- 4. HIGHWAY ENVIRONMENT                                                -->
+            <!-- ===================================================================== -->
+            <a-entity id="env-highway" position="0 0 0" visible="false">
+                <a-plane position="0 0 -200" rotation="-90 0 0" width="30" height="600"
+                    material="color: #111827; roughness: 0.8"></a-plane>
+                <a-entity id="highway-props"></a-entity>
+            </a-entity>
+
+            <!-- ===================================================================== -->
+            <!-- 5. 3D INFINITE CITY ROAD ENVIRONMENT                                  -->
+            <!-- ===================================================================== -->
+            <a-entity id="env-city" position="0 0 0" visible="false">
+                <a-plane id="city-ground-plane" position="0 -0.05 0" rotation="-90 0 0" width="220" height="900"
+                    material="color: #080c14; roughness: 0.9; metalness: 0.1"></a-plane>
+                <a-entity id="city-chunks-container"></a-entity>
+            </a-entity>
+
+            <!-- ===================================================================== -->
+            <!-- PROCEDURAL 3D VEHICLE CHASSIS & ROOT                                  -->
+            <!-- ===================================================================== -->
+            <a-entity id="vehicle-root" position="0 0.1 0" rotation="0 0 0">
+                <a-entity id="vehicle-visual-model"></a-entity>
+                <a-entity id="vehicle-headlights" position="0 0.5 -1.2"
+                    light="type: spot; color: #e2e8f0; intensity: 3.5; distance: 45; angle: 35; penumbra: 0.5; castShadow: true"
+                    rotation="0 180 0"></a-entity>
+            </a-entity>
+        </a-scene>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 2D GLASSMORPHIC HUD DASHBOARD (AERODYN 3D)                                 -->
+    <!-- ========================================================================= -->
+    <div id="hud-overlay">
+
+        <!-- Top Navigation Header -->
+        <header id="top-nav" class="hud-interactive">
+            <div class="brand-logo">
+                AERODYN <span>3D</span>
+                <div class="badge-tag">ENGINEERING LAB</div>
+            </div>
+
+            <!-- Vehicle Category Toggle -->
+            <div class="vehicle-selector-group">
+                <button class="veh-btn active" id="btn-cat-moto"
+                    onclick="handleAction('selectCategory', 'motorcycle')">🏍️ MOTORCYCLES (6)</button>
+                <button class="veh-btn" id="btn-cat-car" onclick="handleAction('selectCategory', 'car')">🚗 CARS
+                    (5)</button>
+            </div>
+
+            <!-- Modes Navigation -->
+            <nav class="mode-nav">
+                <button class="mode-tab active" id="btn-mode-showroom"
+                    onclick="handleAction('switchLocation', 'showroom')">🏢 GARAGE</button>
+                <button class="mode-tab" id="btn-mode-city" onclick="handleAction('switchLocation', 'city')">🏙️ CITY
+                    ROAD</button>
+                <button class="mode-tab" id="btn-mode-track" onclick="handleAction('switchLocation', 'track')">🏁 TEST
+                    TRACK</button>
+                <button class="mode-tab" id="btn-mode-license" onclick="handleAction('switchLocation', 'license')">🪪
+                    LICENSE EXAM</button>
+                <button class="mode-tab" id="btn-mode-highway" onclick="handleAction('switchLocation', 'highway')">🛣️
+                    HIGHWAY</button>
+            </nav>
+
+            <!-- Top Utility Actions -->
+            <div class="top-actions">
+                <button class="action-btn btn-compare" onclick="toggleComparisonModal()">📊 COMPARE</button>
+                <button class="action-btn" onclick="toggleHelpModal()">❓ GUIDE</button>
+                <button class="action-btn" id="btn-audio" onclick="handleAction('toggleAudio', '')">🔊 AUDIO:
+                    ON</button>
+            </div>
+        </header>
+
+        <!-- Left Sidebar: 11-Part Modification Studio -->
+        <aside id="sidebar-mods" class="hud-interactive">
+            <div class="panel-header">
+                <h2>🛠️ VEHICLE & MOD STUDIO</h2>
+                <span class="mod-count" id="active-vehicle-title">Ghost RR 1000</span>
+            </div>
+
+            <div class="mods-scrollable">
+                <!-- Quick Vehicle Select List -->
+                <div class="vehicles-list-row" id="sidebar-vehicle-pills"></div>
+
+                <!-- Paint Swatches -->
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area">
+                            <span class="mod-icon">🎨</span>
+                            <span class="mod-title">Custom Paint & Coating</span>
+                        </div>
+                        <span class="mod-current-val" id="val-paint">Rosso Corsa</span>
+                    </div>
+                    <div class="color-swatches-row">
+                        <div class="c-swatch" style="background:#e11d48" onclick="handleAction('applyColor', '#e11d48')"
+                            title="Rosso Corsa"></div>
+                        <div class="c-swatch" style="background:#00f3ff" onclick="handleAction('applyColor', '#00f3ff')"
+                            title="Cyber Cyan"></div>
+                        <div class="c-swatch" style="background:#16a34a" onclick="handleAction('applyColor', '#16a34a')"
+                            title="Viper Green"></div>
+                        <div class="c-swatch" style="background:#f59e0b" onclick="handleAction('applyColor', '#f59e0b')"
+                            title="Solar Orange"></div>
+                        <div class="c-swatch" style="background:#9333ea" onclick="handleAction('applyColor', '#9333ea')"
+                            title="Neon Violet"></div>
+                        <div class="c-swatch" style="background:#f8fafc" onclick="handleAction('applyColor', '#f8fafc')"
+                            title="Pure Pearl"></div>
+                        <div class="c-swatch" style="background:#0f172a" onclick="handleAction('applyColor', '#0f172a')"
+                            title="Midnight Onyx"></div>
+                    </div>
+                </div>
+
+                <!-- 11 Modular Upgrade Cards -->
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">⚡</span><span class="mod-title">Engine
+                                Block</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-engine"
+                            onclick="handleAction('cycleMod', 'engine')">Stock Block</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">🌀</span><span class="mod-title">Forced
+                                Induction</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-turbo"
+                            onclick="handleAction('cycleMod', 'turbo')">Naturally Aspirated</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">💨</span><span class="mod-title">Exhaust
+                                System</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-exhaust"
+                            onclick="handleAction('cycleMod', 'exhaust')">Stock Exhaust</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">🌬️</span><span class="mod-title">Air
+                                Intake</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-intake"
+                            onclick="handleAction('cycleMod', 'intake')">OEM Airbox</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">💻</span><span class="mod-title">ECU
+                                Tuning</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-ecu" onclick="handleAction('cycleMod', 'ecu')">Factory
+                            Map</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">⚙️</span><span
+                                class="mod-title">Transmission</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-transmission"
+                            onclick="handleAction('cycleMod', 'transmission')">Stock 5/6-Spd</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">🛞</span><span class="mod-title">Tires &
+                                Compound</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-tires"
+                            onclick="handleAction('cycleMod', 'tires')">All-Season</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">🛑</span><span class="mod-title">Brakes &
+                                Rotors</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-brakes"
+                            onclick="handleAction('cycleMod', 'brakes')">Steel Discs</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">🔩</span><span class="mod-title">Coilovers /
+                                Springs</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-suspension"
+                            onclick="handleAction('cycleMod', 'suspension')">Comfort OEM</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">🪶</span><span class="mod-title">Weight
+                                Reduction</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-weight"
+                            onclick="handleAction('cycleMod', 'weight')">Full Interior</button>
+                    </div>
+                </div>
+
+                <div class="mod-card">
+                    <div class="mod-card-header">
+                        <div class="mod-title-area"><span class="mod-icon">✈️</span><span class="mod-title">GT Aero &
+                                Wing</span></div>
+                        <button class="mod-cycle-btn" id="btn-mod-aero" onclick="handleAction('cycleMod', 'aero')">Stock
+                            Aero</button>
+                    </div>
+                </div>
+
+                <button class="action-btn"
+                    style="background:rgba(255,51,102,0.15); border-color:var(--red); color:#fff; justify-content:center; margin-top:4px;"
+                    onclick="handleAction('resetMods', '')">🔄 RESET FACTORY CONFIGURATION</button>
+            </div>
+        </aside>
+
+        <!-- Right Sidebar: Live Performance Metrics & Educational Insight -->
+        <aside id="sidebar-perf" class="hud-interactive">
+            <div class="panel-header">
+                <h2>📊 PERFORMANCE TELEMETRY</h2>
+                <span class="mod-count" id="perf-dyno-grade">S-CLASS</span>
+            </div>
+
+            <div class="perf-metrics-container">
+                <!-- 10 Real-time Stats with Progress Bars -->
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">Horsepower</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-hp">205 HP</span><span
+                                class="stat-val-delta delta-pos" id="delta-hp">+0</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-hp" style="width: 45%;"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">Torque Output</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-torque">113 Nm</span><span
+                                class="stat-val-delta delta-pos" id="delta-torque">+0</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-torque" style="width: 40%;"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">0–100 km/h Accel</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-accel">2.85 s</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-accel" style="width: 85%; background:var(--green);"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">Top Speed</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-topspeed">299 km/h</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-topspeed" style="width: 75%;"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">100–0 km/h Braking</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-brake">36 m</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-brake" style="width: 80%; background:var(--amber);"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">Cornering Grip (μ)</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-grip">0.96 μ</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-grip" style="width: 70%;"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">Dry Weight</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-weight">175 kg</span><span
+                                class="stat-val-delta delta-pos" id="delta-weight">0kg</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-weight" style="width: 30%;"></div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-header">
+                        <span class="stat-label">Chassis Stability</span>
+                        <div class="stat-values"><span class="stat-val-curr" id="stat-stability">90%</span></div>
+                    </div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="bar-stability" style="width: 90%;"></div>
+                    </div>
+                </div>
+
+                <!-- Educational Insight Box -->
+                <div id="edu-card">
+                    <div class="edu-header">💡 AUTOMOTIVE ENGINEERING INSIGHT</div>
+                    <div class="edu-title" id="edu-title">Baseline Configuration</div>
+                    <div class="edu-why" id="edu-why">Every modification shifts the engineering compromise. Power
+                        requires tire grip to accelerate, larger brakes require cooling, and lowered suspension reduces
+                        body roll.</div>
+                    <div class="edu-pros-cons">
+                        <div class="edu-pros"><b>PROS:</b> <span id="edu-pros">Balanced OEM longevity & low wear</span>
+                        </div>
+                        <div class="edu-cons"><b>CONS:</b> <span id="edu-cons">Conservative power limit</span></div>
+                    </div>
+                </div>
+
+                <button class="action-btn"
+                    style="background:var(--cyan); color:#05070d; justify-content:center; font-weight:800; padding:10px; margin-top:2px;"
+                    onclick="handleAction('switchLocation', 'track')">🏁 DRIVE ON TEST TRACK</button>
+            </div>
+        </aside>
+
+        <!-- Bottom Toolbar -->
+        <footer id="bottom-toolbar" class="hud-interactive">
+            <div class="view-controls">
+                <button class="tool-btn active" id="btn-cam-first" onclick="setCameraView('first')">🥽 1ST PERSON
+                    COCKPIT</button>
+                <button class="tool-btn" id="btn-cam-third" onclick="setCameraView('third')">📹 3RD PERSON
+                    CHASE</button>
+                <button class="tool-btn" onclick="handleAction('resetPos', '')">🔄 RESET POSITION</button>
+                <button class="tool-btn" onclick="soundSynth.playHorn()">📯 HORN</button>
+            </div>
+
+            <div style="font-family:var(--font-tech); font-size:0.85rem; color:var(--text-muted);">
+                USE <kbd style="background:rgba(255,255,255,0.1); padding:2px 5px; border-radius:3px; color:#fff;">W A S
+                    D</kbd> / ARROWS TO DRIVE &bull; <kbd
+                    style="background:rgba(255,255,255,0.1); padding:2px 5px; border-radius:3px; color:#fff;">SPACE</kbd>
+                HANDBRAKE
+            </div>
+        </footer>
+
+        <!-- Active Driving Speedometer Cluster (When Driving on Track) -->
+        <div id="driving-hud">
+            <div class="gauge-unit">
+                <div class="speedo-num" id="hud-speed">0</div>
+                <div class="speedo-label">KM / H</div>
+            </div>
+            <div class="gauge-unit">
+                <div class="tach-num" id="hud-rpm">800</div>
+                <div class="tach-label">RPM</div>
+            </div>
+            <div class="gauge-unit">
+                <div class="gear-num" id="hud-gear">1</div>
+                <div class="tach-label">GEAR</div>
+            </div>
+            <div class="drive-telemetry">
+                <div class="telemetry-row"><span>G-FORCE:</span><b id="hud-gforce" style="color:var(--cyan)">0.00 G</b>
+                </div>
+                <div class="telemetry-row"><span>BRAKE TEMP:</span><b id="hud-braketemp">38 °C</b></div>
+                <div class="telemetry-row"><span>POWER:</span><b id="hud-power" style="color:var(--green)">205 HP</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drive Controls Guide -->
+        <div id="drive-controls-guide">
+            <div><kbd>W</kbd> Throttle</div>
+            <div><kbd>S</kbd> Brake / Reverse</div>
+            <div><kbd>A</kbd> <kbd>D</kbd> Steer</div>
+            <div><kbd>SPACE</kbd> Handbrake</div>
+            <div><kbd>C</kbd> Camera View</div>
+            <div><kbd>R</kbd> Reset Track</div>
+        </div>
+
+        <!-- VR Toast Alert -->
+        <div id="vr-toast">
+            <span id="toast-icon">⚡</span>
+            <span id="toast-msg">Welcome to AeroDyn 3D Platform</span>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 1: FULL SPECIFICATIONS COMPARISON (BEFORE vs AFTER)                 -->
+    <!-- ========================================================================= -->
+    <div id="modal-comparison">
+        <div class="compare-container">
+            <div class="compare-header">
+                <h2 style="font-family:var(--font-display); font-size:1.1rem; color:var(--cyan);">📊 BEFORE vs AFTER
+                    PERFORMANCE COMPARISON</h2>
+                <button class="action-btn" onclick="toggleComparisonModal()">✕ CLOSE</button>
+            </div>
+            <div class="compare-body">
+                <div class="compare-col">
+                    <h3 style="font-family:var(--font-tech); font-size:1.1rem; color:var(--text-muted);">FACTORY
+                        BASELINE (OEM)</h3>
+                    <table class="compare-table" id="table-factory-specs"></table>
+                </div>
+                <div class="compare-col" style="border-color:rgba(0,243,255,0.3); background:rgba(18,28,45,0.85);">
+                    <h3 style="font-family:var(--font-tech); font-size:1.1rem; color:var(--cyan);">TUNED CONFIGURATION
+                        (CURRENT)</h3>
+                    <table class="compare-table" id="table-mod-specs"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 2: AUTOMOTIVE ENGINEERING EDUCATIONAL GUIDE                         -->
+    <!-- ========================================================================= -->
+    <div id="modal-help">
+        <div class="help-box">
+            <div class="compare-header" style="background:transparent; padding:0;">
+                <h2 style="font-family:var(--font-display); font-size:1.1rem; color:var(--cyan);">💡 AUTOMOTIVE
+                    ENGINEERING PRINCIPLES GUIDE</h2>
+                <button class="action-btn" onclick="toggleHelpModal()">✕ CLOSE</button>
+            </div>
+            <div class="help-grid">
+                <div class="help-card">
+                    <h4>⚡ Power-to-Weight Ratio</h4>
+                    <ul>
+                        <li>&bull; Acceleration is governed by $F = m \cdot a$.</li>
+                        <li>&bull; Reducing 100 kg often yields faster lap times than adding 50 HP.</li>
+                        <li>&bull; Lighter vehicles brake later and corner with higher lateral Gs.</li>
+                    </ul>
+                </div>
+                <div class="help-card">
+                    <h4>🌀 Forced Induction (Boost)</h4>
+                    <ul>
+                        <li>&bull; Turbochargers utilize hot waste exhaust gasses to compress air.</li>
+                        <li>&bull; Superchargers are belt-driven for instant zero-lag response.</li>
+                        <li>&bull; Trade-off: Higher cylinder pressures require high-octane fuel & cooling.</li>
+                    </ul>
+                </div>
+                <div class="help-card">
+                    <h4>🛞 Tire Traction & Contact Patch</h4>
+                    <ul>
+                        <li>&bull; Racing slicks generate maximum friction ($\mu > 1.0$) when warm.</li>
+                        <li>&bull; Wider tires provide superior cornering but increase rolling resistance.</li>
+                        <li>&bull; Wet conditions require tread sipes to evacuate water and avoid hydroplaning.</li>
+                    </ul>
+                </div>
+                <div class="help-card">
+                    <h4>🔩 Suspension Dynamics</h4>
+                    <ul>
+                        <li>&bull; Lowering ride height reduces body roll and lowers center of gravity.</li>
+                        <li>&bull; Excessively stiff dampers cause loss of traction over uneven bumpy tarmac.</li>
+                        <li>&bull; High-downforce wings provide high-speed stability at the cost of top speed drag.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- JAVASCRIPT APPLICATION CORE & PHYSICS ENGINE                              -->
+    <!-- ========================================================================= -->
+    <script>
+        /* =========================================================================
+           1. PROCEDURAL WEB AUDIO SYNTHESIZER
+           ========================================================================= */
+        class VehicleAudioSynthesizer {
+            constructor() {
+                this.ctx = null;
+                this.initialized = false;
+                this.enabled = true;
+                this.engineOsc = null;
+                this.engineGain = null;
+                this.filterNode = null;
+                this.noiseNode = null;
+                this.noiseGain = null;
+            }
+
+            init() {
+                if (this.initialized) return;
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+
+                    this.engineOsc = this.ctx.createOscillator();
+                    this.engineOsc.type = 'sawtooth';
+                    this.engineOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
+
+                    this.filterNode = this.ctx.createBiquadFilter();
+                    this.filterNode.type = 'lowpass';
+                    this.filterNode.frequency.setValueAtTime(350, this.ctx.currentTime);
+
+                    this.engineGain = this.ctx.createGain();
+                    this.engineGain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+
+                    this.engineOsc.connect(this.filterNode);
+                    this.filterNode.connect(this.engineGain);
+                    this.engineGain.connect(this.ctx.destination);
+                    this.engineOsc.start();
+
+                    const bufferSize = this.ctx.sampleRate * 2;
+                    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const output = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+
+                    this.noiseNode = this.ctx.createBufferSource();
+                    this.noiseNode.buffer = noiseBuffer;
+                    this.noiseNode.loop = true;
+
+                    const noiseFilter = this.ctx.createBiquadFilter();
+                    noiseFilter.type = 'bandpass';
+                    noiseFilter.frequency.setValueAtTime(800, this.ctx.currentTime);
+
+                    this.noiseGain = this.ctx.createGain();
+                    this.noiseGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+                    this.noiseNode.connect(noiseFilter);
+                    noiseFilter.connect(this.noiseGain);
+                    this.noiseGain.connect(this.ctx.destination);
+                    this.noiseNode.start();
+
+                    this.initialized = true;
+                } catch (e) {
+                    console.warn("Audio Context init pending interaction:", e);
+                }
+            }
+
+            updateEngineSound(rpm, throttle) {
+                if (!this.initialized || !this.enabled || !this.ctx) return;
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+
+                const targetFreq = 42 + (rpm / 12000) * 350;
+                this.engineOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.05);
+
+                const filterFreq = 320 + throttle * 1200 + (rpm / 12000) * 800;
+                this.filterNode.frequency.setTargetAtTime(filterFreq, this.ctx.currentTime, 0.05);
+
+                const vol = 0.05 + throttle * 0.07;
+                this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.05);
+            }
+
+            triggerSkid(intensity = 0.3) {
+                if (!this.initialized || !this.enabled) return;
+                this.noiseGain.gain.setTargetAtTime(Math.min(intensity, 0.25), this.ctx.currentTime, 0.03);
+            }
+
+            stopSkid() {
+                if (!this.initialized || !this.enabled) return;
+                this.noiseGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+            }
+
+            playHorn() {
+                this.init();
+                if (!this.initialized || !this.enabled) return;
+                const osc1 = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc1.type = 'sawtooth';
+                osc2.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(440, this.ctx.currentTime);
+                osc2.frequency.setValueAtTime(554.37, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc1.start();
+                osc2.start();
+                osc1.stop(this.ctx.currentTime + 0.5);
+                osc2.stop(this.ctx.currentTime + 0.5);
+            }
+
+            playClick() {
+                this.init();
+                if (!this.initialized || !this.enabled) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            }
+        }
+
+        const soundSynth = new VehicleAudioSynthesizer();
+
+        /* =========================================================================
+           2. VEHICLE DATABASE (6 Motorcycles, 5 Cars)
+           ========================================================================= */
+        const VEHICLE_CATALOG = {
+            // --- MOTORCYCLES ---
+            'moto_commuter': {
+                id: 'moto_commuter',
+                type: 'motorcycle',
+                name: 'Eco-Commuter 125',
+                category: 'Beginner Commuter',
+                hp: 12,
+                torque: 11,
+                topSpeed: 105,
+                accel0100: 12.5,
+                weight: 118,
+                engine: '124cc Single OHC',
+                color: '#0284c7',
+                finish: 'gloss',
+                gears: 5,
+                handling: 0.95,
+                econ: 2.1
+            },
+            'moto_sports': {
+                id: 'moto_sports',
+                type: 'motorcycle',
+                name: 'Apex Falcon 600',
+                category: 'Sports Bike',
+                hp: 120,
+                torque: 66,
+                topSpeed: 255,
+                accel0100: 3.4,
+                weight: 188,
+                engine: '599cc Inline-4 DOHC',
+                color: '#e11d48',
+                finish: 'metallic',
+                gears: 6,
+                handling: 0.92,
+                econ: 5.4
+            },
+            'moto_superbike': {
+                id: 'moto_superbike',
+                type: 'motorcycle',
+                name: 'Ghost RR 1000',
+                category: 'Superbike Racing',
+                hp: 205,
+                torque: 113,
+                topSpeed: 299,
+                accel0100: 2.85,
+                weight: 175,
+                engine: '998cc Crossplane Inline-4',
+                color: '#00f3ff',
+                finish: 'gloss',
+                gears: 6,
+                handling: 0.96,
+                econ: 6.8
+            },
+            'moto_cruiser': {
+                id: 'moto_cruiser',
+                type: 'motorcycle',
+                name: 'Iron Highway 1200',
+                category: 'Cruiser V-Twin',
+                hp: 75,
+                torque: 98,
+                topSpeed: 180,
+                accel0100: 5.2,
+                weight: 255,
+                engine: '1202cc Air-Cooled V-Twin',
+                color: '#0f172a',
+                finish: 'matte',
+                gears: 5,
+                handling: 0.85,
+                econ: 5.8
+            },
+            'moto_adv': {
+                id: 'moto_adv',
+                type: 'motorcycle',
+                name: 'Terra Explorer 850',
+                category: 'Adventure Tourer',
+                hp: 95,
+                torque: 92,
+                topSpeed: 210,
+                accel0100: 4.1,
+                weight: 228,
+                engine: '853cc Parallel-Twin',
+                color: '#f59e0b',
+                finish: 'matte',
+                gears: 6,
+                handling: 0.89,
+                econ: 4.8
+            },
+            'moto_electric': {
+                id: 'moto_electric',
+                type: 'motorcycle',
+                name: 'CyberPulse EV-X',
+                category: 'Electric Hyper-Moto',
+                hp: 160,
+                torque: 190,
+                topSpeed: 240,
+                accel0100: 2.7,
+                weight: 210,
+                engine: 'Direct-Drive High-Torque PMAC',
+                color: '#9333ea',
+                finish: 'metallic',
+                gears: 1,
+                handling: 0.94,
+                econ: 14.0
+            },
+
+            // --- CARS ---
+            'car_hatchback': {
+                id: 'car_hatchback',
+                type: 'car',
+                name: 'Velo City 1.5',
+                category: 'Compact Hatchback',
+                hp: 110,
+                torque: 145,
+                topSpeed: 175,
+                accel0100: 9.8,
+                weight: 1050,
+                engine: '1.5L Turbo 4-Cylinder',
+                color: '#16a34a',
+                finish: 'gloss',
+                gears: 5,
+                handling: 0.90,
+                econ: 6.2
+            },
+            'car_sedan': {
+                id: 'car_sedan',
+                type: 'car',
+                name: 'Monarch Executive',
+                category: 'Luxury Sedan',
+                hp: 240,
+                torque: 350,
+                topSpeed: 240,
+                accel0100: 6.2,
+                weight: 1580,
+                engine: '2.0L Twin-Scroll Turbo',
+                color: '#f8fafc',
+                finish: 'metallic',
+                gears: 8,
+                handling: 0.88,
+                econ: 8.4
+            },
+            'car_sports': {
+                id: 'car_sports',
+                type: 'car',
+                name: 'Apex GT-R Concept',
+                category: 'Sports Supercar',
+                hp: 580,
+                torque: 650,
+                topSpeed: 330,
+                accel0100: 3.1,
+                weight: 1420,
+                engine: '3.8L Twin-Turbo V6',
+                color: '#e11d48',
+                finish: 'metallic',
+                gears: 7,
+                handling: 0.98,
+                econ: 12.5
+            },
+            'car_suv': {
+                id: 'car_suv',
+                type: 'car',
+                name: 'Titan 4x4 Overland',
+                category: 'Full-Size SUV',
+                hp: 310,
+                torque: 450,
+                topSpeed: 200,
+                accel0100: 7.4,
+                weight: 2200,
+                engine: '3.5L V6 EcoBoost',
+                color: '#0f172a',
+                finish: 'matte',
+                gears: 6,
+                handling: 0.82,
+                econ: 11.2
+            },
+            'car_electric': {
+                id: 'car_electric',
+                type: 'car',
+                name: 'Hyperion Ion EV',
+                category: 'Electric Hypercar',
+                hp: 850,
+                torque: 1100,
+                topSpeed: 350,
+                accel0100: 2.1,
+                weight: 1850,
+                engine: 'Tri-Motor AWD Graphene EV',
+                color: '#00f3ff',
+                finish: 'gloss',
+                gears: 2,
+                handling: 0.97,
+                econ: 22.0
+            }
+        };
+
+        let currentVehicleId = 'moto_superbike';
+        let currentVehicle = { ...VEHICLE_CATALOG[currentVehicleId] };
+        let currentCategory = 'motorcycle';
+        let activeLocation = 'showroom';
+        let currentCameraView = 'first';
+
+        /* =========================================================================
+           3. 11-PART MODIFICATION DEFINITIONS & EDUCATIONAL DATA
+           ========================================================================= */
+        const MOD_SPECS = {
+            engine: [
+                { name: 'Stock OEM Block', hp: 0, torque: 0, weight: 0, why: 'Factory balance of fuel efficiency, emissions, and reliability.', pros: 'OEM reliability & warranty', cons: 'Factory power limits' },
+                { name: 'Forged 3.0L Internals', hp: 45, torque: 50, weight: -5, why: 'Lightweight forged pistons & connecting rods withstand higher RPM and boost pressure.', pros: 'Higher RPM redline (+45 HP)', cons: 'Slightly higher engine noise' },
+                { name: 'Billet Race Block', hp: 95, torque: 110, weight: -15, why: 'Solid CNC-machined aluminum block with high-lift aggressive camshafts.', pros: 'Massive top-end horsepower (+95 HP)', cons: 'Rough idle, higher fuel consumption' }
+            ],
+            turbo: [
+                { name: 'Naturally Aspirated', hp: 0, torque: 0, why: 'Direct linear throttle response without turbo lag.', pros: 'Predictable linear torque', cons: 'Capped atmospheric airflow' },
+                { name: 'Twin-Scroll Turbo (+80HP)', hp: 80, torque: 105, why: 'Compresses intake oxygen, allowing significantly more fuel combustion per stroke.', pros: 'Surging mid-range torque (+105 Nm)', cons: 'Mild turbo spool delay below 2500 RPM' },
+                { name: 'Supercharger Pro (+130HP)', hp: 130, torque: 140, why: 'Belt-driven forced induction provides instantaneous boost at idle.', pros: 'Instant throttle response & power', cons: 'Parasitic engine drag at high RPM' }
+            ],
+            exhaust: [
+                { name: 'Stock Exhaust', hp: 0, torque: 0, weight: 0, why: 'OEM catalytic converters restrict flow to minimize decibels.', pros: 'Quiet operation', cons: 'Excess backpressure' },
+                { name: 'Sport Cat-Back (+18HP)', hp: 18, torque: 20, weight: -8, why: 'Mandrel-bent stainless steel reduces backpressure for faster exhaust scavenging.', pros: 'Deep sport tone, +18 HP', cons: 'Mildly louder at highway cruise' },
+                { name: 'Titanium Straight-Pipe (+35HP)', hp: 35, torque: 35, weight: -18, why: 'Ultralight titanium saves 18kg with zero gas flow restriction.', pros: 'Maximum top-end power & weight save', cons: 'High decibel race track volume' }
+            ],
+            intake: [
+                { name: 'OEM Paper Airbox', hp: 0, torque: 0, why: 'Enclosed airbox tuned for quiet cabin acoustics.', pros: 'Quiet intake sound', cons: 'Restricted airflow' },
+                { name: 'High-Flow Cold Air (+15HP)', hp: 15, torque: 15, why: 'Draws colder, denser oxygen from outside engine bay, increasing volumetric efficiency.', pros: 'Sharper throttle response & +15 HP', cons: 'Requires frequent filter cleaning' }
+            ],
+            ecu: [
+                { name: 'Factory ECU Map', hp: 0, torque: 0, why: 'Conservative ignition timing tuned for low-octane fuel.', pros: 'Safe for 87-octane fuel', cons: 'Detuned power delivery' },
+                { name: 'Stage 1 Street Remap (+25HP)', hp: 25, torque: 30, why: 'Advances spark timing and optimizes air-fuel ratio map.', pros: 'Responsive throttle & +25 HP', cons: 'Requires 93+ premium octane' },
+                { name: 'Stage 2 Track Remap (+60HP)', hp: 60, torque: 75, why: 'Aggressive fuel injection parameters and raised RPM rev limiter.', pros: 'Maximum output & boost targets', cons: 'Higher engine heat generation' }
+            ],
+            transmission: [
+                { name: 'Stock 5/6-Speed', top: 0, why: 'Wide gear spacing tuned for relaxed highway fuel economy.', pros: 'Comfortable highway cruising', cons: 'Wide RPM drops between shifts' },
+                { name: 'Close-Ratio 6-Speed', top: -10, why: 'Tightly spaced gear ratios keep engine in the peak powerband during acceleration.', pros: 'Faster corner exit acceleration', cons: 'Higher engine RPM on highway' },
+                { name: '7-Speed Dual-Clutch DCT', top: 15, why: 'Twin clutch packs pre-select next gear for uninterrupted 0.05-second shifts.', pros: 'Lightning-fast seamless upshifts', cons: 'Added electronic complexity' }
+            ],
+            tires: [
+                { name: 'All-Season Touring', grip: 0.88, why: 'Hard rubber tread compound optimized for high mileage and wet weather.', pros: 'Long 60k km tread life', cons: 'Lower cornering limit' },
+                { name: 'Sport Ultra-Grip (19")', grip: 0.94, why: 'Softer compound with reinforced sidewalls enhances lateral grip.', pros: 'High lateral Gs & shorter braking', cons: 'Faster tread wear rate' },
+                { name: 'Full Racing Slicks', grip: 1.05, why: 'Treadless sticky race rubber creates maximum contact patch on dry asphalt.', pros: 'Extreme track cornering grip', cons: 'Zero wet weather traction' }
+            ],
+            brakes: [
+                { name: 'Stock Steel Discs', brakeDist: 0, why: 'Standard cast-iron rotors and 2-piston floating calipers.', pros: 'Low maintenance cost', cons: 'Prone to brake fade under track heat' },
+                { name: 'Slotted 4-Piston BBK', brakeDist: -5, why: 'Slotted rotors vent hot gasses, while 4-piston calipers apply even pad pressure.', pros: 'Shorter stopping distance (-5m)', cons: 'Slightly firmer pedal effort' },
+                { name: 'Carbon Ceramic 6-Piston', brakeDist: -11, why: 'Carbon ceramic rotors dissipate extreme temperatures up to 1000°C without brake fade.', pros: 'Zero brake fade & -11m stopping', cons: 'Requires warm-up to reach optimal grip' }
+            ],
+            suspension: [
+                { name: 'Comfort OEM', height: 0, stability: 85, why: 'Compliant spring rates absorb road bumps and potholes.', pros: 'Plush ride comfort', cons: 'Pronounced body roll in corners' },
+                { name: 'Sport Lowering Springs (-20mm)', height: -0.02, stability: 92, why: 'Lowers vehicle center of gravity, reducing roll under hard steering.', pros: 'Less body roll, sharper steering', cons: 'Firmer ride over speed bumps' },
+                { name: 'Track Race Coilovers (-40mm)', height: -0.04, stability: 99, why: 'Stiff compression and rebound damping keep tire contact patch firmly planted.', pros: 'Maximum cornering stability', cons: 'Harsh ride on rough roads' }
+            ],
+            weight: [
+                { name: 'Full Factory Interior', weight: 0, why: 'Complete cabin sound insulation, power seats, and premium trim.', pros: 'Quiet and comfortable cabin', cons: 'Added mass burdens acceleration & braking' },
+                { name: 'Carbon Hood & Trunk (-45kg)', weight: -45, why: 'Replaces heavy metal body panels with autoclaved carbon composites.', pros: 'Improved weight distribution', cons: 'Premium composite material cost' },
+                { name: 'Stripped Race Chassis (-160kg)', weight: -160, why: 'Removes all non-essential cabin weight for raw power-to-weight ratio.', pros: 'Drastically faster 0-100s & braking', cons: 'No sound deadening or rear seats' }
+            ],
+            aero: [
+                { name: 'Stock Clean Body', drag: 0, downforce: 0, why: 'Low aerodynamic drag coefficient for cruising efficiency.', pros: 'High fuel efficiency', cons: 'Zero high-speed downforce' },
+                { name: 'Front Splitter & Diffuser', drag: 2, downforce: 15, why: 'Channels underbody ground effects to prevent high-speed front lift.', pros: 'High-speed front-end stability', cons: 'Lower ground clearance' },
+                { name: 'GT Carbon High Wing', drag: 8, downforce: 45, why: 'Generates intense aerodynamic downforce over the rear drive wheels.', pros: 'High-speed cornering grip', cons: 'Slightly reduced top-speed efficiency' }
+            ]
+        };
+
+        const activeMods = {
+            engine: 0,
+            turbo: 0,
+            exhaust: 0,
+            intake: 0,
+            ecu: 0,
+            transmission: 0,
+            tires: 0,
+            brakes: 0,
+            suspension: 0,
+            weight: 0,
+            aero: 0
+        };
+
+        /* =========================================================================
+           4. ACTION HANDLER & DISPATCHER
+           ========================================================================= */
+        function handleAction(action, param) {
+            soundSynth.init();
+            soundSynth.playClick();
+
+            switch (action) {
+                case 'selectCategory':
+                    currentCategory = param;
+                    const defaultId = param === 'motorcycle' ? 'moto_superbike' : 'car_sports';
+                    selectVehicle(defaultId);
+                    break;
+                case 'selectVehicle':
+                    selectVehicle(param);
+                    break;
+                case 'switchLocation':
+                    switchLocation(param);
+                    break;
+                case 'applyColor':
+                    applyVehicleColor(param);
+                    break;
+                case 'cycleMod':
+                    cycleModItem(param);
+                    break;
+                case 'resetMods':
+                    resetModsToFactory();
+                    break;
+                case 'toggleAudio':
+                    toggleAudioEngine();
+                    break;
+                case 'resetPos':
+                    resetVehiclePosition();
+                    break;
+            }
+        }
+
+        function setCameraView(viewType) {
+            currentCameraView = viewType;
+            document.getElementById('btn-cam-first').classList.toggle('active', viewType === 'first');
+            document.getElementById('btn-cam-third').classList.toggle('active', viewType === 'third');
+            showToast(viewType === 'first' ? "🥽 1st Person Cockpit View" : "📹 3rd Person Chase View");
+        }
+
+        function toggleComparisonModal() {
+            const modal = document.getElementById('modal-comparison');
+            const isActive = modal.classList.contains('active');
+            if (!isActive) updateComparisonModalData();
+            modal.classList.toggle('active', !isActive);
+        }
+
+        function toggleHelpModal() {
+            const modal = document.getElementById('modal-help');
+            modal.classList.toggle('active');
+        }
+
+        /* =========================================================================
+           5. 3D PROCEDURAL VEHICLE MODEL BUILDER
+           ========================================================================= */
+        function buildProceduralVehicleModel(vehicleData) {
+            const container = document.getElementById('vehicle-visual-model');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const color = vehicleData.color || '#00f3ff';
+            const finish = vehicleData.finish || 'gloss';
+            const roughness = finish === 'matte' ? 0.8 : (finish === 'metallic' ? 0.2 : 0.4);
+            const metalness = finish === 'metallic' ? 0.9 : (finish === 'matte' ? 0.1 : 0.6);
+            const suspHeight = MOD_SPECS.suspension[activeMods.suspension].height || 0;
+
+            if (vehicleData.type === 'motorcycle') {
+                const frame = document.createElement('a-box');
+                frame.setAttribute('position', `0 ${0.55 + suspHeight} 0`);
+                frame.setAttribute('width', '0.22');
+                frame.setAttribute('height', '0.35');
+                frame.setAttribute('depth', '1.1');
+                frame.setAttribute('material', 'color: #1e293b; metalness: 0.8; roughness: 0.3');
+                container.appendChild(frame);
+
+                const tank = document.createElement('a-box');
+                tank.setAttribute('position', `0 ${0.78 + suspHeight} -0.15`);
+                tank.setAttribute('width', '0.36');
+                tank.setAttribute('height', '0.32');
+                tank.setAttribute('depth', '0.75');
+                tank.setAttribute('material', `color: ${color}; roughness: ${roughness}; metalness: ${metalness}`);
+                container.appendChild(tank);
+
+                const tail = document.createElement('a-box');
+                tail.setAttribute('position', `0 ${0.75 + suspHeight} 0.55`);
+                tail.setAttribute('width', '0.24');
+                tail.setAttribute('height', '0.18');
+                tail.setAttribute('depth', '0.6');
+                tail.setAttribute('rotation', '12 0 0');
+                tail.setAttribute('material', `color: ${color}; roughness: ${roughness}; metalness: ${metalness}`);
+                container.appendChild(tail);
+
+                const seat = document.createElement('a-box');
+                seat.setAttribute('position', `0 ${0.68 + suspHeight} 0.2`);
+                seat.setAttribute('width', '0.26');
+                seat.setAttribute('height', '0.08');
+                seat.setAttribute('depth', '0.45');
+                seat.setAttribute('material', 'color: #0f172a; roughness: 0.9');
+                container.appendChild(seat);
+
+                const forkColor = activeMods.suspension > 0 ? '#f59e0b' : '#94a3b8';
+                const forkL = document.createElement('a-cylinder');
+                forkL.setAttribute('position', `-0.12 ${0.42 + suspHeight} -0.85`);
+                forkL.setAttribute('radius', '0.035');
+                forkL.setAttribute('height', '0.8');
+                forkL.setAttribute('rotation', '22 0 0');
+                forkL.setAttribute('material', `color: ${forkColor}; metalness: 0.9; roughness: 0.1`);
+                container.appendChild(forkL);
+
+                const forkR = document.createElement('a-cylinder');
+                forkR.setAttribute('position', `0.12 ${0.42 + suspHeight} -0.85`);
+                forkR.setAttribute('radius', '0.035');
+                forkR.setAttribute('height', '0.8');
+                forkR.setAttribute('rotation', '22 0 0');
+                forkR.setAttribute('material', `color: ${forkColor}; metalness: 0.9; roughness: 0.1`);
+                container.appendChild(forkR);
+
+                const frontWheel = document.createElement('a-torus');
+                frontWheel.setAttribute('position', '0 0.3 -0.95');
+                frontWheel.setAttribute('rotation', '0 90 0');
+                frontWheel.setAttribute('radius', '0.3');
+                frontWheel.setAttribute('radius-tubular', '0.08');
+                frontWheel.setAttribute('material', `color: #0f172a; roughness: ${activeMods.tires === 2 ? 0.2 : 0.8}`);
+                container.appendChild(frontWheel);
+
+                const rearWheel = document.createElement('a-torus');
+                rearWheel.setAttribute('position', '0 0.3 0.85');
+                rearWheel.setAttribute('rotation', '0 90 0');
+                rearWheel.setAttribute('radius', '0.32');
+                rearWheel.setAttribute('radius-tubular', '0.1');
+                rearWheel.setAttribute('material', `color: #0f172a; roughness: ${activeMods.tires === 2 ? 0.2 : 0.8}`);
+                container.appendChild(rearWheel);
+
+                const exhaustColor = activeMods.exhaust === 2 ? '#3b82f6' : (activeMods.exhaust === 1 ? '#e2e8f0' : '#64748b');
+                const exhaust = document.createElement('a-cylinder');
+                exhaust.setAttribute('position', `0.22 ${0.35 + suspHeight} 0.5`);
+                exhaust.setAttribute('radius', activeMods.exhaust > 0 ? '0.06' : '0.045');
+                exhaust.setAttribute('height', '0.6');
+                exhaust.setAttribute('rotation', '75 10 0');
+                exhaust.setAttribute('material', `color: ${exhaustColor}; metalness: 0.95; roughness: 0.1`);
+                container.appendChild(exhaust);
+
+            } else {
+                // --- CAR GEOMETRY ---
+                const chassis = document.createElement('a-box');
+                chassis.setAttribute('position', `0 ${0.45 + suspHeight} 0`);
+                chassis.setAttribute('width', '1.8');
+                chassis.setAttribute('height', '0.45');
+                chassis.setAttribute('depth', '3.8');
+                chassis.setAttribute('material', `color: ${color}; roughness: ${roughness}; metalness: ${metalness}`);
+                container.appendChild(chassis);
+
+                const cabin = document.createElement('a-box');
+                cabin.setAttribute('position', `0 ${0.95 + suspHeight} -0.1`);
+                cabin.setAttribute('width', '1.45');
+                cabin.setAttribute('height', '0.55');
+                cabin.setAttribute('depth', '2.0');
+                cabin.setAttribute('material', 'color: #0f172a; roughness: 0.1; metalness: 0.9');
+                container.appendChild(cabin);
+
+                const windshieldF = document.createElement('a-plane');
+                windshieldF.setAttribute('position', `0 ${0.95 + suspHeight} -1.15`);
+                windshieldF.setAttribute('rotation', '-35 0 0');
+                windshieldF.setAttribute('width', '1.4');
+                windshieldF.setAttribute('height', '0.65');
+                windshieldF.setAttribute('material', 'color: #38bdf8; opacity: 0.6; transparent: true; roughness: 0.1');
+                container.appendChild(windshieldF);
+
+                const wheelCoords = [[-0.95, 0.32, -1.2], [0.95, 0.32, -1.2], [-0.95, 0.32, 1.2], [0.95, 0.32, 1.2]];
+                wheelCoords.forEach(pos => {
+                    const wheel = document.createElement('a-cylinder');
+                    wheel.setAttribute('position', `${pos[0]} ${pos[1]} ${pos[2]}`);
+                    wheel.setAttribute('rotation', '0 0 90');
+                    wheel.setAttribute('radius', '0.34');
+                    wheel.setAttribute('height', '0.24');
+                    wheel.setAttribute('material', `color: #0f172a; roughness: ${activeMods.tires === 2 ? 0.2 : 0.8}`);
+                    container.appendChild(wheel);
+
+                    const rim = document.createElement('a-cylinder');
+                    rim.setAttribute('position', `${pos[0] * 1.02} ${pos[1]} ${pos[2]}`);
+                    rim.setAttribute('rotation', '0 0 90');
+                    rim.setAttribute('radius', '0.22');
+                    rim.setAttribute('height', '0.25');
+                    rim.setAttribute('material', 'color: #e2e8f0; metalness: 0.9; roughness: 0.1');
+                    container.appendChild(rim);
+
+                    if (activeMods.brakes > 0) {
+                        const cal = document.createElement('a-box');
+                        cal.setAttribute('position', `${pos[0] * 0.98} ${pos[1] + 0.12} ${pos[2]}`);
+                        cal.setAttribute('width', '0.12');
+                        cal.setAttribute('height', '0.08');
+                        cal.setAttribute('depth', '0.14');
+                        cal.setAttribute('material', `color: ${activeMods.brakes === 2 ? '#eab308' : '#ef4444'}; metalness: 0.8`);
+                        container.appendChild(cal);
+                    }
+                });
+
+                if (activeMods.aero > 0) {
+                    const splitter = document.createElement('a-box');
+                    splitter.setAttribute('position', `0 ${0.22 + suspHeight} -1.95`);
+                    splitter.setAttribute('width', '1.85');
+                    splitter.setAttribute('height', '0.04');
+                    splitter.setAttribute('depth', '0.35');
+                    splitter.setAttribute('material', 'color: #020617; metalness: 0.8');
+                    container.appendChild(splitter);
+                }
+
+                if (activeMods.aero === 2 || vehicleData.id === 'car_sports' || vehicleData.id === 'car_electric') {
+                    const spoiler = document.createElement('a-box');
+                    spoiler.setAttribute('position', `0 ${1.05 + suspHeight} 1.7`);
+                    spoiler.setAttribute('width', activeMods.aero === 2 ? '1.85' : '1.6');
+                    spoiler.setAttribute('height', '0.05');
+                    spoiler.setAttribute('depth', '0.35');
+                    spoiler.setAttribute('material', 'color: #020617; metalness: 0.8; roughness: 0.2');
+                    container.appendChild(spoiler);
+                }
+            }
+        }
+
+        /* =========================================================================
+           6. VEHICLE DYNAMICS CALCULATOR & PHYSICS ENGINE
+           ========================================================================= */
+        const physics = {
+            speed: 0,
+            speedMS: 0,
+            rpm: 800,
+            gear: 1,
+            steerAngle: 0,
+            gForce: 0,
+            brakeTemp: 38,
+            position: { x: 0, y: 0.05, z: 0 },
+            heading: 0
+        };
+
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            soundSynth.init();
+            if (e.code === 'KeyC') setCameraView(currentCameraView === 'first' ? 'third' : 'first');
+            if (e.code === 'KeyH') soundSynth.playHorn();
+            if (e.code === 'KeyR') resetVehiclePosition();
+        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+        window.addEventListener('pointerdown', () => soundSynth.init());
+
+        function calculateDynamicSpecs() {
+            const base = currentVehicle;
+            const eng = MOD_SPECS.engine[activeMods.engine];
+            const tur = MOD_SPECS.turbo[activeMods.turbo];
+            const exh = MOD_SPECS.exhaust[activeMods.exhaust];
+            const int = MOD_SPECS.intake[activeMods.intake];
+            const ecu = MOD_SPECS.ecu[activeMods.ecu];
+            const wgt = MOD_SPECS.weight[activeMods.weight];
+            const brk = MOD_SPECS.brakes[activeMods.brakes];
+            const tir = MOD_SPECS.tires[activeMods.tires];
+            const sus = MOD_SPECS.suspension[activeMods.suspension];
+            const trn = MOD_SPECS.transmission[activeMods.transmission];
+
+            const hpGain = eng.hp + tur.hp + exh.hp + int.hp + ecu.hp;
+            const torqueGain = eng.torque + tur.torque + exh.torque + int.torque + ecu.torque;
+            const weightDelta = (eng.weight || 0) + (exh.weight || 0) + wgt.weight;
+
+            const finalHP = Math.round(base.hp + hpGain);
+            const finalTorque = Math.round(base.torque + torqueGain);
+            const finalWeight = Math.max(80, Math.round(base.weight + weightDelta));
+            const finalTopSpeed = Math.round(base.topSpeed + (hpGain * 0.4) + (trn.top || 0));
+
+            const pwrRatio = finalHP / finalWeight;
+            const basePwrRatio = base.hp / base.weight;
+            const accelFactor = Math.sqrt(basePwrRatio / Math.max(0.01, pwrRatio));
+            const finalAccel = Math.max(1.8, (base.accel0100 * accelFactor).toFixed(2));
+            const finalBraking = Math.max(22, Math.round(36 + brk.brakeDist));
+            const finalGrip = tir.grip.toFixed(2);
+            const finalHandling = Math.min(100, Math.round(base.handling * 100 * (tir.grip / 0.9) * (sus.stability / 90)));
+            const finalStability = sus.stability;
+            const finalEcon = (base.econ * (1 + (hpGain / base.hp) * 0.3)).toFixed(1);
+
+            return {
+                hp: finalHP,
+                hpGain,
+                torque: finalTorque,
+                torqueGain,
+                weight: finalWeight,
+                weightDelta,
+                topSpeed: finalTopSpeed,
+                accel: finalAccel,
+                braking: finalBraking,
+                grip: finalGrip,
+                handling: finalHandling,
+                stability: finalStability,
+                econ: finalEcon
+            };
+        }
+
+        function updateVehiclePhysics(deltaTime) {
+            if (activeLocation === 'showroom') {
+                const turntable = document.getElementById('turntable-base');
+                const vehicleRoot = document.getElementById('vehicle-root');
+                if (turntable && vehicleRoot) {
+                    turntable.object3D.rotation.y += 0.005;
+                    vehicleRoot.object3D.position.set(0, 0.15, 0);
+                    vehicleRoot.object3D.rotation.y = turntable.object3D.rotation.y;
+                }
+                return;
+            }
+
+            const dt = Math.min(deltaTime, 0.1);
+            const dyno = calculateDynamicSpecs();
+
+            let throttle = 0;
+            let brake = 0;
+            let steer = 0;
+
+            if (keys['KeyW'] || keys['ArrowUp']) throttle = 1.0;
+            if (keys['KeyS'] || keys['ArrowDown']) brake = 1.0;
+            if (keys['KeyA'] || keys['ArrowLeft']) steer = -1.0;
+            if (keys['KeyD'] || keys['ArrowRight']) steer = 1.0;
+            const handbrake = keys['Space'] || false;
+
+            const topSpeedMS = (dyno.topSpeed * 1.1) / 3.6;
+            const maxTorqueAccel = (dyno.torque * 9.8) / (dyno.weight * 1.8);
+            const brakeBoost = 36 / dyno.braking;
+
+            if (throttle > 0 && brake === 0) {
+                const powerRatio = Math.max(0.1, 1 - (physics.speedMS / topSpeedMS));
+                physics.speedMS += maxTorqueAccel * throttle * powerRatio * dt;
+            } else if (brake > 0) {
+                if (physics.speedMS > 0.5) {
+                    physics.speedMS = Math.max(0, physics.speedMS - (18 * brakeBoost) * brake * dt);
+                    physics.brakeTemp = Math.min(350, physics.brakeTemp + 0.5);
+                    soundSynth.triggerSkid(0.15);
+                } else {
+                    physics.speedMS = Math.max(-8, physics.speedMS - 4 * dt);
+                }
+            } else {
+                physics.speedMS = Math.max(0, physics.speedMS - 2.5 * dt);
+                soundSynth.stopSkid();
+                physics.brakeTemp = Math.max(38, physics.brakeTemp - 0.2);
+            }
+
+            if (handbrake) {
+                physics.speedMS = Math.max(0, physics.speedMS - 25 * dt);
+                soundSynth.triggerSkid(0.3);
+            }
+
+            physics.speed = Math.round(physics.speedMS * 3.6);
+
+            if (currentVehicle.type === 'motorcycle' && currentVehicle.id === 'moto_electric') {
+                physics.gear = 'D';
+                physics.rpm = Math.min(12000, 800 + (physics.speedMS / topSpeedMS) * 11000);
+            } else {
+                const gearRatios = [0, 35, 70, 115, 165, 220, 300, 360];
+                let calculatedGear = 1;
+                for (let g = 1; g <= currentVehicle.gears; g++) {
+                    if (physics.speed > gearRatios[g - 1]) calculatedGear = g;
+                }
+                physics.gear = calculatedGear;
+                const gearMinSpeed = gearRatios[physics.gear - 1] || 0;
+                const gearMaxSpeed = gearRatios[physics.gear] || topSpeedMS * 3.6;
+                const gearProgress = Math.max(0, (physics.speed - gearMinSpeed) / (gearMaxSpeed - gearMinSpeed));
+                physics.rpm = Math.round(1500 + gearProgress * 8500 + (throttle * 1200));
+            }
+
+            const steerSpeedSensitivity = Math.max(0.2, 1 - (physics.speed / 280));
+            physics.steerAngle += (steer * 45 * steerSpeedSensitivity * (dyno.handling / 100) - physics.steerAngle) * 0.15;
+
+            if (Math.abs(physics.speedMS) > 0.1) {
+                physics.heading -= (physics.steerAngle * (physics.speedMS / 10)) * dt;
+            }
+
+            const rad = (physics.heading * Math.PI) / 180;
+            physics.position.x += Math.sin(rad) * physics.speedMS * dt;
+            physics.position.z -= Math.cos(rad) * physics.speedMS * dt;
+
+            physics.gForce = Math.abs((physics.speedMS * physics.speedMS * Math.sin((physics.steerAngle * Math.PI) / 180)) / 98).toFixed(2);
+
+            const vehicleRoot = document.getElementById('vehicle-root');
+            if (vehicleRoot) {
+                vehicleRoot.object3D.position.set(physics.position.x, 0.05, physics.position.z);
+                vehicleRoot.object3D.rotation.y = rad;
+            }
+
+            soundSynth.updateEngineSound(physics.rpm, throttle);
+            updateDrivingHUD(dyno);
+            updateCameraPosition();
+            updateInfiniteCityRoadStreaming();
+        }
+
+        /* =========================================================================
+           7. UI TELEMETRY SYNCHRONIZER
+           ========================================================================= */
+        function updateDrivingHUD(dyno) {
+            const hudSpeed = document.getElementById('hud-speed');
+            const hudRpm = document.getElementById('hud-rpm');
+            const hudGear = document.getElementById('hud-gear');
+            const hudGforce = document.getElementById('hud-gforce');
+            const hudBrakeTemp = document.getElementById('hud-braketemp');
+            const hudPower = document.getElementById('hud-power');
+
+            if (hudSpeed) hudSpeed.textContent = Math.abs(physics.speed);
+            if (hudRpm) hudRpm.textContent = physics.rpm;
+            if (hudGear) hudGear.textContent = physics.gear;
+            if (hudGforce) hudGforce.textContent = `${physics.gForce} G`;
+            if (hudBrakeTemp) hudBrakeTemp.textContent = `${Math.round(physics.brakeTemp)} °C`;
+            if (hudPower) hudPower.textContent = `${dyno.hp} HP`;
+        }
+
+        function updateCameraPosition() {
+            const rig = document.getElementById('rig');
+            if (!rig || activeLocation === 'showroom') return;
+
+            const rad = (physics.heading * Math.PI) / 180;
+            if (currentCameraView === 'first') {
+                const yOffset = currentVehicle.type === 'motorcycle' ? 1.05 : 0.95;
+                const zOffset = currentVehicle.type === 'motorcycle' ? 0.05 : -0.2;
+                rig.object3D.position.set(
+                    physics.position.x + Math.sin(rad) * zOffset,
+                    physics.position.y + yOffset,
+                    physics.position.z - Math.cos(rad) * zOffset
+                );
+                rig.object3D.rotation.y = rad;
+            } else if (currentCameraView === 'third') {
+                const dist = currentVehicle.type === 'motorcycle' ? 3.8 : 5.5;
+                const height = currentVehicle.type === 'motorcycle' ? 1.8 : 2.2;
+                rig.object3D.position.set(
+                    physics.position.x - Math.sin(rad) * dist,
+                    physics.position.y + height,
+                    physics.position.z + Math.cos(rad) * dist
+                );
+                rig.object3D.rotation.y = rad;
+            }
+        }
+
+        function resetVehiclePosition() {
+            physics.speed = 0;
+            physics.speedMS = 0;
+            physics.rpm = 800;
+            physics.position = { x: 0, y: 0.05, z: 0 };
+            physics.heading = 0;
+            showToast("🔄 Vehicle Reset to Start Line");
+        }
+
+        /* =========================================================================
+           8. SELECTION, CUSTOMIZATION & EDUCATIONAL HUD UPDATER
+           ========================================================================= */
+        function selectVehicle(vehicleId) {
+            if (!VEHICLE_CATALOG[vehicleId]) return;
+            currentVehicleId = vehicleId;
+            currentVehicle = { ...VEHICLE_CATALOG[vehicleId] };
+            currentCategory = currentVehicle.type;
+
+            document.getElementById('btn-cat-moto').classList.toggle('active', currentCategory === 'motorcycle');
+            document.getElementById('btn-cat-car').classList.toggle('active', currentCategory === 'car');
+            document.getElementById('active-vehicle-title').textContent = currentVehicle.name;
+
+            buildProceduralVehicleModel(currentVehicle);
+            updateSidebarVehiclePills();
+            updateTelemetrySidebar();
+            showToast(`Selected: ${currentVehicle.name}`);
+        }
+
+        function updateSidebarVehiclePills() {
+            const container = document.getElementById('sidebar-vehicle-pills');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const vehicles = Object.values(VEHICLE_CATALOG).filter(v => v.type === currentCategory);
+            vehicles.forEach(v => {
+                const card = document.createElement('div');
+                card.className = `veh-item-card ${v.id === currentVehicleId ? 'active' : ''}`;
+                card.innerHTML = `<span>${v.name}</span><span style="font-size:0.75rem; opacity:0.8;">${v.hp} HP</span>`;
+                card.onclick = () => handleAction('selectVehicle', v.id);
+                container.appendChild(card);
+            });
+        }
+
+        function cycleModItem(modKey) {
+            if (!MOD_SPECS[modKey]) return;
+            activeMods[modKey] = (activeMods[modKey] + 1) % MOD_SPECS[modKey].length;
+
+            const currentMod = MOD_SPECS[modKey][activeMods[modKey]];
+            const btn = document.getElementById(`btn-mod-${modKey}`);
+            if (btn) btn.textContent = currentMod.name;
+
+            buildProceduralVehicleModel(currentVehicle);
+            updateTelemetrySidebar();
+
+            // Update Educational Card
+            const eduTitle = document.getElementById('edu-title');
+            const eduWhy = document.getElementById('edu-why');
+            const eduPros = document.getElementById('edu-pros');
+            const eduCons = document.getElementById('edu-cons');
+
+            if (eduTitle) eduTitle.textContent = `${modKey.toUpperCase()}: ${currentMod.name}`;
+            if (eduWhy) eduWhy.textContent = currentMod.why;
+            if (eduPros) eduPros.textContent = currentMod.pros || 'Enhanced performance';
+            if (eduCons) eduCons.textContent = currentMod.cons || 'Higher maintenance';
+
+            showToast(`Upgraded ${modKey.toUpperCase()}: ${currentMod.name}`);
+        }
+
+        function resetModsToFactory() {
+            Object.keys(activeMods).forEach(k => activeMods[k] = 0);
+            Object.keys(MOD_SPECS).forEach(modKey => {
+                const btn = document.getElementById(`btn-mod-${modKey}`);
+                if (btn) btn.textContent = MOD_SPECS[modKey][0].name;
+            });
+
+            buildProceduralVehicleModel(currentVehicle);
+            updateTelemetrySidebar();
+            showToast("🔄 Factory Baseline Restored");
+        }
+
+        function updateTelemetrySidebar() {
+            const dyno = calculateDynamicSpecs();
+
+            document.getElementById('stat-hp').textContent = `${dyno.hp} HP`;
+            document.getElementById('delta-hp').textContent = dyno.hpGain > 0 ? `+${dyno.hpGain}` : '+0';
+            document.getElementById('bar-hp').style.width = `${Math.min(100, (dyno.hp / 900) * 100)}%`;
+
+            document.getElementById('stat-torque').textContent = `${dyno.torque} Nm`;
+            document.getElementById('delta-torque').textContent = dyno.torqueGain > 0 ? `+${dyno.torqueGain}` : '+0';
+            document.getElementById('bar-torque').style.width = `${Math.min(100, (dyno.torque / 1100) * 100)}%`;
+
+            document.getElementById('stat-accel').textContent = `${dyno.accel} s`;
+            document.getElementById('bar-accel').style.width = `${Math.max(10, 100 - (dyno.accel / 12) * 100)}%`;
+
+            document.getElementById('stat-topspeed').textContent = `${dyno.topSpeed} km/h`;
+            document.getElementById('bar-topspeed').style.width = `${Math.min(100, (dyno.topSpeed / 380) * 100)}%`;
+
+            document.getElementById('stat-brake').textContent = `${dyno.braking} m`;
+            document.getElementById('bar-brake').style.width = `${Math.max(20, 100 - (dyno.braking / 45) * 100)}%`;
+
+            document.getElementById('stat-grip').textContent = `${dyno.grip} μ`;
+            document.getElementById('bar-grip').style.width = `${Math.min(100, (dyno.grip / 1.1) * 100)}%`;
+
+            document.getElementById('stat-weight').textContent = `${dyno.weight} kg`;
+            document.getElementById('delta-weight').textContent = dyno.weightDelta !== 0 ? `${dyno.weightDelta}kg` : '0kg';
+            document.getElementById('bar-weight').style.width = `${Math.min(100, (dyno.weight / 2200) * 100)}%`;
+
+            document.getElementById('stat-stability').textContent = `${dyno.stability}%`;
+            document.getElementById('bar-stability').style.width = `${dyno.stability}%`;
+        }
+
+        function updateComparisonModalData() {
+            const base = currentVehicle;
+            const dyno = calculateDynamicSpecs();
+
+            const tableFactory = document.getElementById('table-factory-specs');
+            const tableMod = document.getElementById('table-mod-specs');
+
+            if (tableFactory) {
+                tableFactory.innerHTML = `
+          <tr><th>Horsepower</th><td><b>${base.hp} HP</b></td></tr>
+          <tr><th>Torque</th><td><b>${base.torque} Nm</b></td></tr>
+          <tr><th>0–100 km/h</th><td><b>${base.accel0100} s</b></td></tr>
+          <tr><th>Top Speed</th><td><b>${base.topSpeed} km/h</b></td></tr>
+          <tr><th>Braking (100–0)</th><td><b>36 m</b></td></tr>
+          <tr><th>Dry Weight</th><td><b>${base.weight} kg</b></td></tr>
+          <tr><th>Tire Grip</th><td><b>0.88 μ</b></td></tr>
+          <tr><th>Stability</th><td><b>85%</b></td></tr>
+          <tr><th>Efficiency</th><td><b>${base.econ} L/100</b></td></tr>
+        `;
+            }
+
+            if (tableMod) {
+                tableMod.innerHTML = `
+          <tr><th>Horsepower</th><td><b style="color:var(--green)">${dyno.hp} HP (+${dyno.hpGain})</b></td></tr>
+          <tr><th>Torque</th><td><b style="color:var(--green)">${dyno.torque} Nm (+${dyno.torqueGain})</b></td></tr>
+          <tr><th>0–100 km/h</th><td><b style="color:var(--green)">${dyno.accel} s</b></td></tr>
+          <tr><th>Top Speed</th><td><b style="color:var(--cyan)">${dyno.topSpeed} km/h</b></td></tr>
+          <tr><th>Braking (100–0)</th><td><b style="color:var(--amber)">${dyno.braking} m</b></td></tr>
+          <tr><th>Dry Weight</th><td><b style="color:${dyno.weightDelta < 0 ? 'var(--green)' : '#fff'}">${dyno.weight} kg (${dyno.weightDelta}kg)</b></td></tr>
+          <tr><th>Tire Grip</th><td><b style="color:var(--cyan)">${dyno.grip} μ</b></td></tr>
+          <tr><th>Stability</th><td><b>${dyno.stability}%</b></td></tr>
+          <tr><th>Efficiency</th><td><b>${dyno.econ} L/100</b></td></tr>
+        `;
+            }
+        }
+
+        function applyVehicleColor(hex) {
+            currentVehicle.color = hex;
+            buildProceduralVehicleModel(currentVehicle);
+            showToast(`Applied Paint: ${hex}`);
+        }
+
+        function switchLocation(locationKey) {
+            activeLocation = locationKey;
+
+            document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-mode-${locationKey}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const isDriving = locationKey === 'track' || locationKey === 'license' || locationKey === 'highway' || locationKey === 'city';
+
+            document.getElementById('env-showroom').setAttribute('visible', locationKey === 'showroom');
+            document.getElementById('env-track').setAttribute('visible', locationKey === 'track');
+            document.getElementById('env-license').setAttribute('visible', locationKey === 'license');
+            document.getElementById('env-highway').setAttribute('visible', locationKey === 'highway');
+            document.getElementById('env-city').setAttribute('visible', locationKey === 'city');
+
+            document.getElementById('driving-hud').classList.toggle('visible', isDriving);
+            document.getElementById('drive-controls-guide').style.display = isDriving ? 'flex' : 'none';
+
+            const rig = document.getElementById('rig');
+            if (locationKey === 'showroom') {
+                physics.speed = 0;
+                physics.speedMS = 0;
+                if (rig) {
+                    rig.object3D.position.set(0, 1.2, 4.2);
+                    rig.object3D.rotation.set(0, 0, 0);
+                }
+                showToast("🏢 Welcome to AeroDyn Garage");
+            } else if (locationKey === 'city') {
+                physics.speed = 0;
+                physics.speedMS = 0;
+                physics.position = { x: 0, y: 0.05, z: 0 };
+                physics.heading = 0;
+                initInfiniteCityRoad();
+                showToast("🏙️ Infinite City Road Initialized");
+            } else {
+                physics.speed = 0;
+                physics.speedMS = 0;
+                physics.position = { x: 0, y: 0.05, z: 0 };
+                physics.heading = 0;
+                showToast(`🏁 Testing Mode: ${locationKey.toUpperCase()}`);
+            }
+        }
+
+        function toggleAudioEngine() {
+            soundSynth.init();
+            soundSynth.enabled = !soundSynth.enabled;
+            document.getElementById('btn-audio').textContent = soundSynth.enabled ? '🔊 AUDIO: ON' : '🔇 AUDIO: OFF';
+            showToast(soundSynth.enabled ? "Engine Sound Enabled" : "Audio Muted");
+        }
+
+        let toastTimer = null;
+        function showToast(msg) {
+            const toast = document.getElementById('vr-toast');
+            const text = document.getElementById('toast-msg');
+            if (!toast || !text) return;
+            text.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        /* =========================================================================
+           9. INFINITE PROCEDURAL CITY ROAD STREAMING ENGINE
+           ========================================================================= */
+        const CITY_CHUNK_SIZE = 100;
+        const NUM_CITY_CHUNKS = 8;
+        let cityChunks = [];
+        let citySignIndex = 0;
+
+        function initInfiniteCityRoad() {
+            const container = document.getElementById('city-chunks-container');
+            if (!container) return;
+            container.innerHTML = '';
+            cityChunks = [];
+
+            for (let i = 0; i < NUM_CITY_CHUNKS; i++) {
+                const zOffset = 50 - (i * CITY_CHUNK_SIZE);
+                const chunkEl = createCityChunk(zOffset, i);
+                container.appendChild(chunkEl);
+                cityChunks.push({
+                    element: chunkEl,
+                    zPos: zOffset,
+                    index: i
+                });
+            }
+        }
+
+        function createCityChunk(zOffset, chunkIdx) {
+            const chunk = document.createElement('a-entity');
+            chunk.setAttribute('position', `0 0 ${zOffset}`);
+
+            // Main Avenue Roadway (100m)
+            const road = document.createElement('a-plane');
+            road.setAttribute('position', '0 0.02 0');
+            road.setAttribute('rotation', '-90 0 0');
+            road.setAttribute('width', '24');
+            road.setAttribute('height', CITY_CHUNK_SIZE);
+            road.setAttribute('material', 'color: #111827; roughness: 0.8');
+            chunk.appendChild(road);
+
+            // Double Yellow Center Dividers
+            const yL = document.createElement('a-box');
+            yL.setAttribute('position', '-0.15 0.04 0');
+            yL.setAttribute('width', '0.12');
+            yL.setAttribute('height', '0.02');
+            yL.setAttribute('depth', CITY_CHUNK_SIZE);
+            yL.setAttribute('material', 'color: #f59e0b; shader: flat');
+            chunk.appendChild(yL);
+
+            const yR = document.createElement('a-box');
+            yR.setAttribute('position', '0.15 0.04 0');
+            yR.setAttribute('width', '0.12');
+            yR.setAttribute('height', '0.02');
+            yR.setAttribute('depth', CITY_CHUNK_SIZE);
+            yR.setAttribute('material', 'color: #f59e0b; shader: flat');
+            chunk.appendChild(yR);
+
+            // Dashed White Lane Lines
+            for (let d = -40; d <= 40; d += 10) {
+                const dashL = document.createElement('a-box');
+                dashL.setAttribute('position', `-5.5 0.04 ${d}`);
+                dashL.setAttribute('width', '0.25');
+                dashL.setAttribute('height', '0.02');
+                dashL.setAttribute('depth', '4.5');
+                dashL.setAttribute('material', 'color: #ffffff; shader: flat');
+                chunk.appendChild(dashL);
+
+                const dashR = document.createElement('a-box');
+                dashR.setAttribute('position', `5.5 0.04 ${d}`);
+                dashR.setAttribute('width', '0.25');
+                dashR.setAttribute('height', '0.02');
+                dashR.setAttribute('depth', '4.5');
+                dashR.setAttribute('material', 'color: #ffffff; shader: flat');
+                chunk.appendChild(dashR);
+            }
+
+            // Sidewalks Left & Right
+            const walkL = document.createElement('a-box');
+            walkL.setAttribute('position', '-15 0.12 0');
+            walkL.setAttribute('width', '6');
+            walkL.setAttribute('height', '0.2');
+            walkL.setAttribute('depth', CITY_CHUNK_SIZE);
+            walkL.setAttribute('material', 'color: #334155; roughness: 0.9');
+            chunk.appendChild(walkL);
+
+            const walkR = document.createElement('a-box');
+            walkR.setAttribute('position', '15 0.12 0');
+            walkR.setAttribute('width', '6');
+            walkR.setAttribute('height', '0.2');
+            walkR.setAttribute('depth', CITY_CHUNK_SIZE);
+            walkR.setAttribute('material', 'color: #334155; roughness: 0.9');
+            chunk.appendChild(walkR);
+
+            // Crossroad Intersection (every 2nd chunk)
+            if (chunkIdx % 2 === 0) {
+                const crossRoad = document.createElement('a-plane');
+                crossRoad.setAttribute('position', '0 0.03 0');
+                crossRoad.setAttribute('rotation', '-90 0 0');
+                crossRoad.setAttribute('width', '160');
+                crossRoad.setAttribute('height', '24');
+                crossRoad.setAttribute('material', 'color: #111827; roughness: 0.8');
+                chunk.appendChild(crossRoad);
+
+                // Zebra Crosswalks
+                for (let s = -10; s <= 10; s += 2) {
+                    const strN = document.createElement('a-box');
+                    strN.setAttribute('position', `${s} 0.045 -14`);
+                    strN.setAttribute('width', '0.8');
+                    strN.setAttribute('height', '0.02');
+                    strN.setAttribute('depth', '3.5');
+                    strN.setAttribute('material', 'color: #ffffff; shader: flat');
+                    chunk.appendChild(strN);
+
+                    const strS = document.createElement('a-box');
+                    strS.setAttribute('position', `${s} 0.045 14`);
+                    strS.setAttribute('width', '0.8');
+                    strS.setAttribute('height', '0.02');
+                    strS.setAttribute('depth', '3.5');
+                    strS.setAttribute('material', 'color: #ffffff; shader: flat');
+                    chunk.appendChild(strS);
+                }
+
+                // Traffic Light Posts
+                [[-13, -14], [13, -14], [-13, 14], [13, 14]].forEach(tPos => {
+                    const pole = document.createElement('a-cylinder');
+                    pole.setAttribute('position', `${tPos[0]} 3.5 ${tPos[1]}`);
+                    pole.setAttribute('radius', '0.15');
+                    pole.setAttribute('height', '7');
+                    pole.setAttribute('material', 'color: #475569');
+                    chunk.appendChild(pole);
+
+                    const box = document.createElement('a-box');
+                    box.setAttribute('position', `${tPos[0]} 6.2 ${tPos[1]}`);
+                    box.setAttribute('width', '0.6');
+                    box.setAttribute('height', '1.6');
+                    box.setAttribute('depth', '0.6');
+                    box.setAttribute('material', 'color: #0f172a');
+                    chunk.appendChild(box);
+
+                    const light = document.createElement('a-sphere');
+                    light.setAttribute('position', `${tPos[0]} 5.8 ${tPos[1] + 0.32}`);
+                    light.setAttribute('radius', '0.18');
+                    light.setAttribute('material', 'color: #00ff88; shader: flat; emissive: #00ff88; emissiveIntensity: 2');
+                    chunk.appendChild(light);
+                });
+            }
+
+            // 4 Skyscrapers per chunk
+            const bldgColors = ['#0f172a', '#1e293b', '#0d1829', '#182234', '#090d16'];
+            const signs = ['AERODYN MOTORS', 'CYBER DYNAMICS', 'NEO METROPOLIS', 'HYPERION EV', 'TURBO LAB', 'APEX LAB', 'QUANTUM TECH', 'NEXUS AUTOMOTIVE'];
+
+            [-28, 28].forEach((relZ, sIdx) => {
+                const hL = 26 + ((chunkIdx * 3 + sIdx) % 5) * 10;
+                const bL = document.createElement('a-box');
+                bL.setAttribute('position', `-32 ${hL / 2} ${relZ}`);
+                bL.setAttribute('width', '24');
+                bL.setAttribute('height', hL);
+                bL.setAttribute('depth', '26');
+                bL.setAttribute('material', `color: ${bldgColors[(chunkIdx + sIdx) % bldgColors.length]}; roughness: 0.5; metalness: 0.5`);
+                chunk.appendChild(bL);
+
+                const winL = document.createElement('a-plane');
+                winL.setAttribute('position', `-19.9 ${hL / 2} ${relZ}`);
+                winL.setAttribute('rotation', '0 90 0');
+                winL.setAttribute('width', '22');
+                winL.setAttribute('height', hL - 4);
+                winL.setAttribute('material', 'color: #00f3ff; opacity: 0.25; transparent: true; wireframe: true');
+                chunk.appendChild(winL);
+
+                const hR = 28 + ((chunkIdx * 2 + sIdx) % 5) * 9;
+                const bR = document.createElement('a-box');
+                bR.setAttribute('position', `32 ${hR / 2} ${relZ}`);
+                bR.setAttribute('width', '24');
+                bR.setAttribute('height', hR);
+                bR.setAttribute('depth', '26');
+                bR.setAttribute('material', `color: ${bldgColors[(chunkIdx + sIdx + 1) % bldgColors.length]}; roughness: 0.5; metalness: 0.5`);
+                chunk.appendChild(bR);
+
+                const winR = document.createElement('a-plane');
+                winR.setAttribute('position', `19.9 ${hR / 2} ${relZ}`);
+                winR.setAttribute('rotation', '0 -90 0');
+                winR.setAttribute('width', '22');
+                winR.setAttribute('height', hR - 4);
+                winR.setAttribute('material', 'color: #ffb703; opacity: 0.22; transparent: true; wireframe: true');
+                chunk.appendChild(winR);
+
+                if ((chunkIdx + sIdx) % 2 === 0) {
+                    const signBox = document.createElement('a-box');
+                    signBox.setAttribute('position', `-19.7 14 ${relZ}`);
+                    signBox.setAttribute('rotation', '0 90 0');
+                    signBox.setAttribute('width', '16');
+                    signBox.setAttribute('height', '3.5');
+                    signBox.setAttribute('depth', '0.4');
+                    signBox.setAttribute('material', 'color: #0f172a');
+
+                    const txt = document.createElement('a-text');
+                    txt.setAttribute('value', signs[citySignIndex % signs.length]);
+                    txt.setAttribute('align', 'center');
+                    txt.setAttribute('position', '0 0 0.25');
+                    txt.setAttribute('color', citySignIndex % 2 === 0 ? '#00f3ff' : '#ff0055');
+                    txt.setAttribute('width', '14');
+                    txt.setAttribute('font', 'mozillavr');
+                    signBox.appendChild(txt);
+                    chunk.appendChild(signBox);
+                    citySignIndex++;
+                }
+            });
+
+            // Street Lamps & Planters
+            [-35, -12, 12, 35].forEach(lampZ => {
+                const lPole = document.createElement('a-cylinder');
+                lPole.setAttribute('position', `-12.5 4 ${lampZ}`);
+                lPole.setAttribute('radius', '0.12');
+                lPole.setAttribute('height', '8');
+                lPole.setAttribute('material', 'color: #475569');
+                chunk.appendChild(lPole);
+
+                const lArm = document.createElement('a-box');
+                lArm.setAttribute('position', `-11.5 8 ${lampZ}`);
+                lArm.setAttribute('width', '2.2');
+                lArm.setAttribute('height', '0.12');
+                lArm.setAttribute('depth', '0.12');
+                lArm.setAttribute('material', 'color: #475569');
+                chunk.appendChild(lArm);
+
+                const lHead = document.createElement('a-sphere');
+                lHead.setAttribute('position', `-10.5 7.85 ${lampZ}`);
+                lHead.setAttribute('radius', '0.25');
+                lHead.setAttribute('material', 'color: #fef08a; shader: flat; emissive: #fef08a; emissiveIntensity: 2');
+                chunk.appendChild(lHead);
+
+                const rPole = document.createElement('a-cylinder');
+                rPole.setAttribute('position', `12.5 4 ${lampZ}`);
+                rPole.setAttribute('radius', '0.12');
+                rPole.setAttribute('height', '8');
+                rPole.setAttribute('material', 'color: #475569');
+                chunk.appendChild(rPole);
+
+                const rArm = document.createElement('a-box');
+                rArm.setAttribute('position', `11.5 8 ${lampZ}`);
+                rArm.setAttribute('width', '2.2');
+                rArm.setAttribute('height', '0.12');
+                rArm.setAttribute('depth', '0.12');
+                rArm.setAttribute('material', 'color: #475569');
+                chunk.appendChild(rArm);
+
+                const rHead = document.createElement('a-sphere');
+                rHead.setAttribute('position', `10.5 7.85 ${lampZ}`);
+                rHead.setAttribute('radius', '0.25');
+                rHead.setAttribute('material', 'color: #fef08a; shader: flat; emissive: #fef08a; emissiveIntensity: 2');
+                chunk.appendChild(rHead);
+
+                const pL = document.createElement('a-cylinder');
+                pL.setAttribute('position', `-13.5 1.5 ${lampZ + 6}`);
+                pL.setAttribute('radius', '0.6');
+                pL.setAttribute('height', '2.8');
+                pL.setAttribute('material', 'color: #15803d; roughness: 0.8');
+                chunk.appendChild(pL);
+
+                const pR = document.createElement('a-cylinder');
+                pR.setAttribute('position', `13.5 1.5 ${lampZ + 6}`);
+                pR.setAttribute('radius', '0.6');
+                pR.setAttribute('height', '2.8');
+                pR.setAttribute('material', 'color: #15803d; roughness: 0.8');
+                chunk.appendChild(pR);
+            });
+
+            return chunk;
+        }
+
+        function updateInfiniteCityRoadStreaming() {
+            if (activeLocation !== 'city' || cityChunks.length === 0) return;
+            const playerZ = physics.position.z;
+
+            const ground = document.getElementById('city-ground-plane');
+            if (ground) ground.object3D.position.z = playerZ - 100;
+
+            let minZ = Infinity;
+            let maxZ = -Infinity;
+            cityChunks.forEach(c => {
+                if (c.zPos < minZ) minZ = c.zPos;
+                if (c.zPos > maxZ) maxZ = c.zPos;
+            });
+
+            cityChunks.forEach(c => {
+                if (c.zPos - playerZ > 120) {
+                    c.zPos = minZ - CITY_CHUNK_SIZE;
+                    c.element.setAttribute('position', `0 0 ${c.zPos}`);
+                    minZ = c.zPos;
+                } else if (playerZ - c.zPos > (NUM_CITY_CHUNKS - 1) * CITY_CHUNK_SIZE) {
+                    c.zPos = maxZ + CITY_CHUNK_SIZE;
+                    c.element.setAttribute('position', `0 0 ${c.zPos}`);
+                    maxZ = c.zPos;
+                }
+            });
+        }
+
+        /* =========================================================================
+           10. SIMULATION RUNTIME LOOP
+           ========================================================================= */
+        AFRAME.registerComponent('simulation-loop', {
+            init: function () { this.lastTime = performance.now(); },
+            tick: function (time) {
+                const delta = (time - this.lastTime) / 1000;
+                this.lastTime = time;
+                updateVehiclePhysics(delta);
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const scene = document.querySelector('a-scene');
+            if (scene) scene.setAttribute('simulation-loop', '');
+
+            selectVehicle('moto_superbike');
+            initInfiniteCityRoad();
+
+            // Track dashes
+            const linesContainer = document.getElementById('track-lines-container');
+            if (linesContainer) {
+                for (let i = 0; i < 35; i++) {
+                    const dash = document.createElement('a-box');
+                    dash.setAttribute('position', `0 0.05 ${-i * 10}`);
+                    dash.setAttribute('width', '0.35');
+                    dash.setAttribute('height', '0.02');
+                    dash.setAttribute('depth', '5.0');
+                    dash.setAttribute('material', 'color: #ffffff; shader: flat');
+                    linesContainer.appendChild(dash);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
